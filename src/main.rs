@@ -5,7 +5,7 @@ use std::io::Read;
 
 fn open_serial_port(path: &str) -> Result<Box<dyn SerialPort>, serialport::Error> {
     serialport::new(path, 115_200)
-        .timeout(Duration::from_millis(1000))
+        .timeout(Duration::from_millis(100))
         .open()
 }
 
@@ -13,6 +13,12 @@ fn remove_non_printable(s: &str) -> String {
     s.chars()
         .filter(|&c| c.is_ascii_graphic() || c.is_ascii_whitespace())
         .collect()
+}
+
+fn send(serial_port: &mut Box<dyn SerialPort>, buf: &[u8]) -> Result<(), serialport::Error> {
+    serial_port.write_all(buf)?;
+    serial_port.flush()?;
+    Ok(())
 }
 
 fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
@@ -29,7 +35,12 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
 }
 
 fn main() {
-    let mut patterns = vec!["U-Boot", "DRAM:  128 MiB", "Net:   eth0: eth@10110000"];
+    let mut patterns = vec![
+        "U-Boot",
+        "DRAM:  128 MiB",
+        "Net:   eth0: eth@10110000",
+        "=>",
+    ];
 
     let args: Vec<String> = env::args().collect();
     let serial_port_name = if args.len() > 1 {
@@ -74,7 +85,7 @@ fn main() {
             }
         }
 
-        if timeout_counter >= 10 {
+        if timeout_counter >= 100 {
             println!("{} ❌️", patterns[0]);
             patterns.drain(..1);
             if patterns.is_empty() {
@@ -82,5 +93,7 @@ fn main() {
             }
             continue;
         }
+
+        send(&mut serial_port, b"x").expect("Failed to write to serial port");
     }
 }
