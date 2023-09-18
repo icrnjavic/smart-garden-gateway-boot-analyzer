@@ -33,18 +33,13 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
     Some(s)
 }
 
-fn analyze(serial_port: &mut Box<dyn SerialPort>) {
-    let mut patterns = vec![
-        "U-Boot",
-        "DRAM:  128 MiB",
-        "Net:   eth0: eth@10110000",
-        "=>",
-    ];
-
+fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>) -> String {
     let mut console_output = String::new();
     let mut timeout_counter = 0;
 
     loop {
+        send(serial_port, b"x").expect("Failed to write to serial port");
+
         if let Some(s) = receive(serial_port) {
             console_output += s.as_str();
             timeout_counter = 0;
@@ -52,25 +47,34 @@ fn analyze(serial_port: &mut Box<dyn SerialPort>) {
             timeout_counter += 1;
         }
 
-        if console_output.contains(patterns[0]) {
-            println!("{} ✔️", patterns[0]);
-            patterns.drain(..1);
-            if patterns.is_empty() {
-                break;
-            }
+        if console_output.contains("=>") || timeout_counter >= 100 {
+            break;
         }
-
-        if timeout_counter >= 100 {
-            println!("{} ❌️", patterns[0]);
-            patterns.drain(..1);
-            if patterns.is_empty() {
-                break;
-            }
-            continue;
-        }
-
-        send(serial_port, b"x").expect("Failed to write to serial port");
     }
+    console_output
+}
+
+fn analyze(serial_port: &mut Box<dyn SerialPort>) {
+    let early_check_info = [
+        ("U-Boot SPL", "No U-Boot detected"),
+        ("DRAM:  128 MiB", "Wrong RAM size detected"),
+        (
+            "Net:   eth0: eth@10110000",
+            "Ethernet could not be initialized",
+        ),
+        ("=>", "Could not enter U-Boot shell"),
+    ];
+    let console_output = enter_u_boot(serial_port);
+
+    for (pattern, issue) in early_check_info {
+        if !console_output.contains(pattern) {
+            println!("! {issue}");
+            println!("-> Linux Module (probably) faulty, return to UniElec");
+            return;
+        }
+    }
+
+    println!("! No issues found");
 }
 
 fn main() {
