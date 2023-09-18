@@ -25,7 +25,7 @@ fn main() {
         open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
 
     loop {
-        analyze(&mut serial_port);
+        analyze(&mut serial_port, std::io::stdout());
 
         if let Ok(false) = inquire::Confirm::new("Continue?")
             .with_default(true)

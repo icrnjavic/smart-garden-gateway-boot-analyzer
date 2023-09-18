@@ -1,6 +1,6 @@
 use core::time::Duration;
 use serialport::SerialPort;
-use std::io::Read;
+use std::io::{Read, Write};
 
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
 static INSTRUCTIONS_BUTTON: &str = "Check button";
@@ -14,7 +14,7 @@ pub fn open_serial_port(path: &str) -> Result<Box<dyn SerialPort>, serialport::E
         .open()
 }
 
-pub fn analyze(serial_port: &mut Box<dyn SerialPort>) {
+pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
     let early_check_info = [
         ("U-Boot SPL", "No U-Boot detected"),
         ("DRAM:  128 MiB", "Wrong RAM size detected"),
@@ -28,7 +28,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) {
 
     for (pattern, issue) in early_check_info {
         if !console_output.contains(pattern) {
-            report_issue(issue, INSTRUCTIONS_LM);
+            report_issue(issue, INSTRUCTIONS_LM, &mut out);
             return;
         }
     }
@@ -49,12 +49,12 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) {
     ];
 
     for (cmd, pattern, issue, instructions) in u_boot_check_info {
-        if !run_u_boot_check(serial_port, cmd, pattern, issue, instructions) {
+        if !run_u_boot_check(serial_port, cmd, pattern, issue, instructions, &mut out) {
             return;
         }
     }
 
-    println!("! No issues found");
+    writeln!(out, "! No issues found").unwrap();
 }
 
 fn remove_non_printable(s: &str) -> String {
@@ -118,16 +118,16 @@ fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str) -> String {
             timeout_counter += 1;
         }
 
-        if timeout_counter >= 10 {
+        if console_output.ends_with("=> ") || timeout_counter >= 10 {
             break;
         }
     }
     console_output
 }
 
-fn report_issue(issue: &str, instructions: &str) {
-    println!("! {issue}");
-    println!("-> {instructions}");
+fn report_issue(issue: &str, instructions: &str, mut out: impl Write) {
+    writeln!(out, "! {issue}").unwrap();
+    writeln!(out, "-> {instructions}").unwrap();
 }
 
 fn run_u_boot_check(
@@ -136,11 +136,12 @@ fn run_u_boot_check(
     pattern: &str,
     issue: &str,
     instructions: &str,
+    mut out: impl Write,
 ) -> bool {
     let console_output = run_u_boot_cmd(serial_port, cmd);
 
     if !console_output.contains(pattern) {
-        report_issue(issue, instructions);
+        report_issue(issue, instructions, &mut out);
         return false;
     }
     true
