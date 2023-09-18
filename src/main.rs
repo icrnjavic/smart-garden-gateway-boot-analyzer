@@ -1,6 +1,5 @@
 use core::time::Duration;
 use serialport::{available_ports, SerialPort};
-use std::env;
 use std::io::Read;
 
 fn open_serial_port(path: &str) -> Result<Box<dyn SerialPort>, serialport::Error> {
@@ -42,29 +41,28 @@ fn main() {
         "=>",
     ];
 
-    let args: Vec<String> = env::args().collect();
-    let serial_port_name = if args.len() > 1 {
-        &args[1]
+    let serial_port_name = if let Ok(ports) = available_ports() {
+        match ports.len() {
+            0 => {
+                eprintln!("No serial ports found");
+                std::process::exit(1);
+            }
+            1 => ports[0].port_name.clone(),
+            _ => {
+                let choices = ports.into_iter().map(|p| p.port_name).collect();
+
+                inquire::Select::new("Select serial port", choices)
+                    .prompt()
+                    .expect("Failed to prompt for serial port")
+            }
+        }
     } else {
-        "/dev/ttyUSB0"
+        eprint!("Failed to get serial port list");
+        std::process::exit(1);
     };
 
-    let mut serial_port: Box<dyn SerialPort>;
-
-    if let Ok(p) = open_serial_port(serial_port_name) {
-        serial_port = p;
-    } else {
-        eprintln!("Could not open serial port {serial_port_name}");
-        eprintln!("You can pass one of the following as argument:");
-        if let Ok(serial_port_list) = available_ports() {
-            for port in serial_port_list {
-                println!("{}", port.port_name);
-            }
-        } else {
-            eprintln!("Failed to get serial port list");
-        }
-        std::process::exit(1);
-    }
+    let mut serial_port =
+        open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
 
     let mut console_output = String::new();
     let mut timeout_counter = 0;
