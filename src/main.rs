@@ -33,7 +33,7 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
     Some(s)
 }
 
-fn main() {
+fn analyze(serial_port: &mut Box<dyn SerialPort>) {
     let mut patterns = vec![
         "U-Boot",
         "DRAM:  128 MiB",
@@ -41,34 +41,11 @@ fn main() {
         "=>",
     ];
 
-    let serial_port_name = if let Ok(ports) = available_ports() {
-        match ports.len() {
-            0 => {
-                eprintln!("No serial ports found");
-                std::process::exit(1);
-            }
-            1 => ports[0].port_name.clone(),
-            _ => {
-                let choices = ports.into_iter().map(|p| p.port_name).collect();
-
-                inquire::Select::new("Select serial port", choices)
-                    .prompt()
-                    .expect("Failed to prompt for serial port")
-            }
-        }
-    } else {
-        eprint!("Failed to get serial port list");
-        std::process::exit(1);
-    };
-
-    let mut serial_port =
-        open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
-
     let mut console_output = String::new();
     let mut timeout_counter = 0;
 
     loop {
-        if let Some(s) = receive(&mut serial_port) {
+        if let Some(s) = receive(serial_port) {
             console_output += s.as_str();
             timeout_counter = 0;
         } else {
@@ -92,6 +69,42 @@ fn main() {
             continue;
         }
 
-        send(&mut serial_port, b"x").expect("Failed to write to serial port");
+        send(serial_port, b"x").expect("Failed to write to serial port");
+    }
+}
+
+fn main() {
+    let serial_port_name = if let Ok(ports) = available_ports() {
+        match ports.len() {
+            0 => {
+                eprintln!("No serial ports found");
+                std::process::exit(1);
+            }
+            1 => ports[0].port_name.clone(),
+            _ => {
+                let choices = ports.into_iter().map(|p| p.port_name).collect();
+
+                inquire::Select::new("Select serial port", choices)
+                    .prompt()
+                    .expect("Failed to prompt for serial port")
+            }
+        }
+    } else {
+        eprint!("Failed to get serial port list");
+        std::process::exit(1);
+    };
+
+    let mut serial_port =
+        open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
+
+    loop {
+        analyze(&mut serial_port);
+
+        if let Ok(false) = inquire::Confirm::new("Continue?")
+            .with_default(true)
+            .prompt()
+        {
+            break;
+        }
     }
 }
