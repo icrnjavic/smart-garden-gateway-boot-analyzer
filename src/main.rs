@@ -2,6 +2,9 @@ use core::time::Duration;
 use serialport::{available_ports, SerialPort};
 use std::io::Read;
 
+static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
+static INSTRUCTIONS_BUTTON: &str = "Check button";
+
 fn open_serial_port(path: &str) -> Result<Box<dyn SerialPort>, serialport::Error> {
     serialport::new(path, 115_200)
         .timeout(Duration::from_millis(100))
@@ -51,7 +54,50 @@ fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>) -> String {
             break;
         }
     }
+    send(serial_port, b"\x03").expect("Failed to write to serial port"); // clear prompt
     console_output
+}
+
+fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str) -> String {
+    send(serial_port, format!("{cmd}\n").as_bytes()).expect("Failed to write to serial port");
+
+    let mut console_output = String::new();
+    let mut timeout_counter = 0;
+
+    loop {
+        if let Some(s) = receive(serial_port) {
+            console_output += s.as_str();
+            timeout_counter = 0;
+        } else {
+            timeout_counter += 1;
+        }
+
+        if console_output.ends_with("=> ") || timeout_counter >= 100 {
+            break;
+        }
+    }
+    console_output
+}
+
+fn report_issue(issue: &str, instructions: &str) {
+    println!("! {issue}");
+    println!("-> {instructions}");
+}
+
+fn run_u_boot_check(
+    serial_port: &mut Box<dyn SerialPort>,
+    cmd: &str,
+    pattern: &str,
+    issue: &str,
+    instructions: &str,
+) -> bool {
+    let console_output = run_u_boot_cmd(serial_port, cmd);
+
+    if !console_output.contains(pattern) {
+        report_issue(issue, instructions);
+        return false;
+    }
+    true
 }
 
 fn analyze(serial_port: &mut Box<dyn SerialPort>) {
@@ -68,8 +114,28 @@ fn analyze(serial_port: &mut Box<dyn SerialPort>) {
 
     for (pattern, issue) in early_check_info {
         if !console_output.contains(pattern) {
-            println!("! {issue}");
-            println!("-> Linux Module (probably) faulty, return to UniElec");
+            report_issue(issue, INSTRUCTIONS_LM);
+            return;
+        }
+    }
+
+    let u_boot_check_info = [
+        (
+            "mtd list",
+            "spi-nand0",
+            "NAND flash not detected",
+            INSTRUCTIONS_LM,
+        ),
+        (
+            "gpio input PA11",
+            "gpio: pin PA11 (gpio 11) value is 1",
+            "Button stuck",
+            INSTRUCTIONS_BUTTON,
+        ),
+    ];
+
+    for (cmd, pattern, issue, instructions) in u_boot_check_info {
+        if !run_u_boot_check(serial_port, cmd, pattern, issue, instructions) {
             return;
         }
     }
