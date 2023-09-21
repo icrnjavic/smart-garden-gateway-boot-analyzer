@@ -1,0 +1,71 @@
+on: pull_request
+
+name: CI
+
+jobs:
+  QA:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
+      - name: Show versions
+        run: |
+          rustc --version
+          cargo --version
+          cargo clippy --version
+          cargo fmt --version
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all -Dclippy::pedantic
+
+      - name: Run Rustfmt
+        run: cargo fmt --check
+
+      - name: Run tests
+        run: cargo test
+
+  Linux:
+    runs-on: ubuntu-latest
+    needs:
+      - QA
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get install -y libudev-dev
+
+      - name: Build
+        run: |
+          cargo build --release
+          tar -C target/release/ -cf target/release/smart-garden-gateway-boot-analyzer.tar smart-garden-gateway-boot-analyzer
+
+      - name: Archive binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: smart-garden-gateway-boot-analyzer-linux
+          path: target/release/smart-garden-gateway-boot-analyzer.tar
+
+  Windows:
+    runs-on: ubuntu-latest
+    needs:
+      - QA
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get install -y g++-mingw-w64-x86-64
+          rustup target add x86_64-pc-windows-gnu
+
+      - name: Build
+        run: cargo build --target x86_64-pc-windows-gnu --release
+
+      - name: Archive binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: smart-garden-gateway-boot-analyzer-windows
+          path: target/x86_64-pc-windows-gnu/release/smart-garden-gateway-boot-analyzer.exe
