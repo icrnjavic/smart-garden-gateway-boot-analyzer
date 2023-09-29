@@ -98,7 +98,7 @@ fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>) -> String {
             timeout_counter += 1;
         }
 
-        if console_output.contains("=>") || timeout_counter >= 100 {
+        if console_output.contains("=>") || timeout_counter >= 10 {
             break;
         }
     }

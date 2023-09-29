@@ -24,14 +24,27 @@ fn main() {
     let mut serial_port =
         open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
 
-    loop {
-        analyze(&mut serial_port, std::io::stderr());
+    // Disable DUT power. The signal is inverted on our (current) hardware.
+    serial_port
+        .write_request_to_send(true)
+        .expect("Failed to set RTS");
 
+    loop {
         if let Ok(false) = inquire::Confirm::new("Continue?")
             .with_default(true)
             .prompt()
         {
             break;
         }
+
+        serial_port
+            .write_request_to_send(false)
+            .expect("Failed to clear RTS");
+
+        analyze(&mut serial_port, std::io::stderr());
+
+        serial_port
+            .write_request_to_send(true)
+            .expect("Failed to set RTS");
     }
 }
