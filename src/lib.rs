@@ -54,7 +54,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
         }
     }
 
-    writeln!(out, "! No issues found").unwrap();
+    writeln!(out, "\n! No issues found").unwrap();
 }
 
 fn remove_non_printable(s: &str) -> String {
@@ -79,6 +79,8 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
     if s.is_empty() {
         return None;
     }
+    print!("{s}");
+    std::io::stdout().flush().expect("Failed to flush stdout");
     Some(s)
 }
 
@@ -126,7 +128,7 @@ fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str) -> String {
 }
 
 fn report_issue(issue: &str, instructions: &str, mut out: impl Write) {
-    writeln!(out, "! {issue}").unwrap();
+    writeln!(out, "\n! {issue}").unwrap();
     writeln!(out, "-> {instructions}").unwrap();
 }
 
