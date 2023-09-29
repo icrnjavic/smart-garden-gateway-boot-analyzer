@@ -74,6 +74,7 @@ impl TestData {
 fn test_analyze(
     #[values(
         "button_stuck",
+        "no_fdata",
         "no_issues",
         "no_nand",
         "no_phy",

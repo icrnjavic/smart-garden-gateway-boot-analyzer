@@ -2,6 +2,15 @@ use core::time::Duration;
 use serialport::SerialPort;
 use std::io::{Read, Write};
 
+#[derive(Default)]
+struct CheckInfo {
+    not_expected: Option<&'static str>,
+    expected: Option<&'static str>,
+    message: &'static str,
+    instructions: &'static str,
+    command: Option<&'static str>,
+}
+
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
 static INSTRUCTIONS_BUTTON: &str = "Check button";
 
@@ -15,41 +24,77 @@ pub fn open_serial_port(path: &str) -> Result<Box<dyn SerialPort>, serialport::E
 }
 
 pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
-    let early_check_info = [
-        ("U-Boot SPL", "No U-Boot detected"),
-        ("DRAM:  128 MiB", "Wrong RAM size detected"),
-        (
-            "Net:   eth0: eth@10110000",
-            "Ethernet could not be initialized",
-        ),
-        ("=>", "Could not enter U-Boot shell"),
+    let early_check_info = vec![
+        CheckInfo {
+            not_expected: Some("SPL: failed to boot from all boot devices"),
+            message: "U-Boot corrupt",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
+        CheckInfo {
+            expected: Some("U-Boot SPL"),
+            message: "No or wrong U-Boot detected",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
+        CheckInfo {
+            expected: Some("DRAM:  128 MiB"),
+            message: "Wrong RAM size detected",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
+        CheckInfo {
+            not_expected: Some("F-Data:Magic value not correct"),
+            expected: Some("F-Data:factory-data version 1 detected"),
+            message: "Factory data missing",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
+        CheckInfo {
+            expected: Some("Net:   eth0: eth@10110000"),
+            message: "Ethernet could not be initialized",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
+        CheckInfo {
+            expected: Some("=>"),
+            message: "Could not enter U-Boot shell",
+            instructions: INSTRUCTIONS_LM,
+            ..Default::default()
+        },
     ];
     let console_output = enter_u_boot(serial_port);
 
-    for (pattern, issue) in early_check_info {
-        if !console_output.contains(pattern) {
-            report_issue(issue, INSTRUCTIONS_LM, &mut out);
+    for info in early_check_info {
+        if info
+            .not_expected
+            .is_some_and(|x| console_output.contains(x))
+            || info.expected.is_some_and(|x| !console_output.contains(x))
+        {
+            report_issue(info.message, info.instructions, &mut out);
             return;
         }
     }
 
-    let u_boot_check_info = [
-        (
-            "mtd list",
-            "spi-nand0",
-            "NAND flash not detected",
-            INSTRUCTIONS_LM,
-        ),
-        (
-            "gpio input PA11",
-            "gpio: pin PA11 (gpio 11) value is 1",
-            "Button stuck",
-            INSTRUCTIONS_BUTTON,
-        ),
+    let u_boot_check_info = vec![
+        CheckInfo {
+            command: Some("mtd list"),
+            not_expected: Some("Could not find a valid device for spi0.1"),
+            expected: Some("spi-nand0"),
+            message: "NAND flash not detected",
+            instructions: INSTRUCTIONS_LM,
+        },
+        CheckInfo {
+            command: Some("gpio input PA11"),
+            not_expected: Some("gpio: pin PA11 (gpio 11) value is 0"),
+            expected: Some("gpio: pin PA11 (gpio 11) value is 1"),
+            message: "Button stuck",
+            instructions: INSTRUCTIONS_BUTTON,
+        },
     ];
 
-    for (cmd, pattern, issue, instructions) in u_boot_check_info {
-        if !run_u_boot_check(serial_port, cmd, pattern, issue, instructions, &mut out) {
+    for info in u_boot_check_info {
+        if !run_u_boot_check(serial_port, &info, &mut out) {
             return;
         }
     }
@@ -134,16 +179,17 @@ fn report_issue(issue: &str, instructions: &str, mut out: impl Write) {
 
 fn run_u_boot_check(
     serial_port: &mut Box<dyn SerialPort>,
-    cmd: &str,
-    pattern: &str,
-    issue: &str,
-    instructions: &str,
+    info: &CheckInfo,
     mut out: impl Write,
 ) -> bool {
-    let console_output = run_u_boot_cmd(serial_port, cmd);
+    let console_output = run_u_boot_cmd(serial_port, info.command.expect("Missing U-Boot command"));
 
-    if !console_output.contains(pattern) {
-        report_issue(issue, instructions, &mut out);
+    if info
+        .not_expected
+        .is_some_and(|x| console_output.contains(x))
+        || info.expected.is_some_and(|x| !console_output.contains(x))
+    {
+        report_issue(info.message, info.instructions, &mut out);
         return false;
     }
     true

@@ -1,0 +1,28 @@
+console_output = [
+    '''
+U-Boot SPL 2021.04-gardena-6 (Jun 10 2021 - 16:05:31 +0000)
+Trying to boot from NOR
+
+
+U-Boot 2021.04-gardena-6 (Jun 10 2021 - 16:05:31 +0000)
+
+CPU:   MediaTek MT7688A ver:1 eco:2
+Boot:  DDR2, SPI-NOR 3-Byte Addr, CPU clock from XTAL
+Clock: CPU: 580MHz, Bus: 193MHz, XTAL: 40MHz
+Model: GARDENA smart Gateway (MT7688)
+DRAM:  128 MiB
+WDT:   Started with servicing (60s timeout)
+Loading Environment from SPIFlash... SF: Detected XM25QH64C with page size 256 Bytes, erase size 4 KiB, total 8 MiB
+OK
+F-Data:Magic value not correct
+F-Data:CRC not correct
+F-Data:Invalid MAC addr: wifi_mac 00:00:00:00:00:00
+F-Data:Invalid MAC addr: eth_mac 00:00:00:00:00:00
+Net:
+Warning: eth@10110000 (eth0) using random MAC address - 46:b6:e8:5b:c9:0e
+eth0: eth@10110000
+Autoboot in 2 seconds
+''',
+    "=>",
+]
+message = "Factory data missing"

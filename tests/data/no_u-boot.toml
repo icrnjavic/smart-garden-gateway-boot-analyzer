@@ -1,4 +1,4 @@
 console_output = [
     "",
 ]
-message = "No U-Boot detected"
+message = "No or wrong U-Boot detected"
