@@ -1,11 +1,20 @@
+use std::io::prelude::*;
+
 use smart_garden_gateway_boot_analyzer::{analyze, open_serial_port};
+
+fn exit_with_error(msg: &str) {
+    eprint!("{msg}\n\nHit \"return\" to exit...");
+    std::io::stderr().flush().unwrap();
+    let _ = std::io::stdin().read(&mut [0u8]).unwrap();
+    std::process::exit(1);
+}
 
 fn main() {
     let serial_port_name = if let Ok(ports) = serialport::available_ports() {
         match ports.len() {
             0 => {
-                eprintln!("No serial ports found");
-                std::process::exit(1);
+                exit_with_error("No serial ports found");
+                std::unreachable!();
             }
             1 => ports[0].port_name.clone(),
             _ => {
@@ -17,8 +26,8 @@ fn main() {
             }
         }
     } else {
-        eprint!("Failed to get serial port list");
-        std::process::exit(1);
+        exit_with_error("Failed to get serial port list");
+        std::unreachable!();
     };
 
     let mut serial_port =
