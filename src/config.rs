@@ -7,9 +7,19 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize)]
 pub struct Config {
     pub serial_port: String,
+    pub invert_rts: bool,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            serial_port: String::new(),
+            invert_rts: true, // Elrad's jig requires an inverted DTR signal for switching DUT power
+        }
+    }
 }
 
 impl Config {

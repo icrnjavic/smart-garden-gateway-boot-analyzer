@@ -1,6 +1,6 @@
 use smart_garden_gateway_boot_analyzer::analyzer::analyze;
 use smart_garden_gateway_boot_analyzer::config::Config;
-use smart_garden_gateway_boot_analyzer::jig::open_serial_port;
+use smart_garden_gateway_boot_analyzer::jig::{open_serial_port, power_off_dut, power_on_dut};
 use std::io::prelude::*;
 
 fn exit_with_error(msg: &str) {
@@ -48,13 +48,10 @@ fn main() {
     let mut serial_port =
         open_serial_port(serial_port_name.as_str()).expect("Failed to open serial port");
 
+    power_off_dut(&mut serial_port, config.invert_rts);
+
     config.serial_port = serial_port_name;
     config.save();
-
-    // Disable DUT power. The signal is inverted on our (current) hardware.
-    serial_port
-        .write_request_to_send(true)
-        .expect("Failed to set RTS");
 
     loop {
         if let Ok(false) = inquire::Confirm::new("Continue?")
@@ -64,14 +61,10 @@ fn main() {
             break;
         }
 
-        serial_port
-            .write_request_to_send(false)
-            .expect("Failed to clear RTS");
+        power_on_dut(&mut serial_port, config.invert_rts);
 
         analyze(&mut serial_port, std::io::stderr());
 
-        serial_port
-            .write_request_to_send(true)
-            .expect("Failed to set RTS");
+        power_off_dut(&mut serial_port, config.invert_rts);
     }
 }
