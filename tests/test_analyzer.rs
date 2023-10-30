@@ -3,7 +3,7 @@ use mockall::mock;
 use rstest::rstest;
 use serde::Deserialize;
 use serialport::{ClearBuffer, DataBits, FlowControl, Parity, StopBits};
-use smart_garden_gateway_boot_analyzer::analyze;
+use smart_garden_gateway_boot_analyzer::analyzer::analyze;
 
 mock! {
     pub SerialPort {}

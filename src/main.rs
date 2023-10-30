@@ -1,6 +1,7 @@
 use std::io::prelude::*;
 
-use smart_garden_gateway_boot_analyzer::{analyze, open_serial_port};
+use smart_garden_gateway_boot_analyzer::analyzer::analyze;
+use smart_garden_gateway_boot_analyzer::jig::open_serial_port;
 
 fn exit_with_error(msg: &str) {
     eprint!("{msg}\n\nHit \"return\" to exit...");
