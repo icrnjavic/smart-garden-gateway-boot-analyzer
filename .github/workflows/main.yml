@@ -41,13 +41,13 @@ jobs:
       - name: Build
         run: |
           cargo build --release
-          tar -C target/release/ -cf target/release/smart-garden-gateway-boot-analyzer.tar smart-garden-gateway-boot-analyzer
+          tar -C target/release/ -cf target/release/smart-garden-gateway-doctor.tar smart-garden-gateway-doctor
 
       - name: Archive binary
         uses: actions/upload-artifact@v3
         with:
-          name: smart-garden-gateway-boot-analyzer-linux
-          path: target/release/smart-garden-gateway-boot-analyzer.tar
+          name: smart-garden-gateway-doctor-linux
+          path: target/release/smart-garden-gateway-doctor.tar
 
   Windows:
     runs-on: ubuntu-latest
@@ -67,5 +67,5 @@ jobs:
       - name: Archive binary
         uses: actions/upload-artifact@v3
         with:
-          name: smart-garden-gateway-boot-analyzer-windows
-          path: target/x86_64-pc-windows-gnu/release/smart-garden-gateway-boot-analyzer.exe
+          name: smart-garden-gateway-doctor-windows
+          path: target/x86_64-pc-windows-gnu/release/smart-garden-gateway-doctor.exe

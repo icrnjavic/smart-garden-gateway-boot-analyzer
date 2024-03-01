@@ -58,7 +58,7 @@ impl Config {
         dirs::config_dir()
             .expect("Failed to get config dir")
             .join("Husqvarna")
-            .join("smart-garden-gateway-boot-analyzer")
+            .join("smart-garden-gateway-doctor")
             .join("config.toml")
     }
 }

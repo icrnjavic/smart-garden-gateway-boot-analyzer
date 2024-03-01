@@ -1,6 +1,6 @@
-use smart_garden_gateway_boot_analyzer::analyzer::analyze;
-use smart_garden_gateway_boot_analyzer::config::Config;
-use smart_garden_gateway_boot_analyzer::jig::{open_serial_port, power_off_dut, power_on_dut};
+use smart_garden_gateway_doctor::analyzer::analyze;
+use smart_garden_gateway_doctor::config::Config;
+use smart_garden_gateway_doctor::jig::{open_serial_port, power_off_dut, power_on_dut};
 use std::io::prelude::*;
 
 fn exit_with_error(msg: &str) {

@@ -776,7 +776,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 
 [[package]]
-name = "smart-garden-gateway-boot-analyzer"
+name = "smart-garden-gateway-doctor"
 version = "0.1.0"
 dependencies = [
  "dirs",
