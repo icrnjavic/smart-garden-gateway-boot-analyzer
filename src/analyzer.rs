@@ -1,3 +1,4 @@
+use log::{debug, info};
 use serialport::SerialPort;
 use std::io::{Read, Write};
 
@@ -10,10 +11,16 @@ struct CheckInfo {
     command: Option<&'static str>,
 }
 
+#[derive(Default)]
+pub struct Analysis {
+    pub message: &'static str,
+    pub instructions: Option<&'static str>,
+}
+
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
 static INSTRUCTIONS_BUTTON: &str = "Check button";
 
-pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
+pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Analysis {
     let early_check_info = vec![
         CheckInfo {
             not_expected: Some("SPL: failed to boot from all boot devices"),
@@ -61,8 +68,12 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
             .is_some_and(|x| console_output.contains(x))
             || info.expected.is_some_and(|x| !console_output.contains(x))
         {
-            report_issue(info.message, info.instructions, &mut out);
-            return;
+            log_issue(info.message, info.instructions);
+
+            return Analysis {
+                message: info.message,
+                instructions: Some(info.instructions),
+            };
         }
     }
 
@@ -84,12 +95,20 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>, mut out: impl Write) {
     ];
 
     for info in u_boot_check_info {
-        if !run_u_boot_check(serial_port, &info, &mut out) {
-            return;
+        if !run_u_boot_check(serial_port, &info) {
+            log_issue(info.message, info.instructions);
+
+            return Analysis {
+                message: info.message,
+                instructions: Some(info.instructions),
+            };
         }
     }
 
-    writeln!(out, "\n! No issues found").unwrap();
+    Analysis {
+        message: "No issues found",
+        ..Default::default()
+    }
 }
 
 fn remove_non_printable(s: &str) -> String {
@@ -114,7 +133,7 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
     if s.is_empty() {
         return None;
     }
-    print!("{s}");
+    debug!("{s}");
     std::io::stdout().flush().expect("Failed to flush stdout");
     Some(s)
 }
@@ -162,25 +181,16 @@ fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str) -> String {
     console_output
 }
 
-fn report_issue(issue: &str, instructions: &str, mut out: impl Write) {
-    writeln!(out, "\n! {issue}").unwrap();
-    writeln!(out, "-> {instructions}").unwrap();
+fn log_issue(issue: &str, instructions: &str) {
+    info!("{issue}");
+    info!("{instructions}");
 }
 
-fn run_u_boot_check(
-    serial_port: &mut Box<dyn SerialPort>,
-    info: &CheckInfo,
-    mut out: impl Write,
-) -> bool {
+fn run_u_boot_check(serial_port: &mut Box<dyn SerialPort>, info: &CheckInfo) -> bool {
     let console_output = run_u_boot_cmd(serial_port, info.command.expect("Missing U-Boot command"));
 
-    if info
+    !(info
         .not_expected
         .is_some_and(|x| console_output.contains(x))
-        || info.expected.is_some_and(|x| !console_output.contains(x))
-    {
-        report_issue(info.message, info.instructions, &mut out);
-        return false;
-    }
-    true
+        || info.expected.is_some_and(|x| !console_output.contains(x)))
 }
