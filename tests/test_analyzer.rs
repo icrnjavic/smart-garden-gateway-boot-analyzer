@@ -71,6 +71,7 @@ impl TestData {
 }
 
 #[rstest]
+#[test_log::test]
 fn test_analyze(
     #[values(
         "button_stuck",
