@@ -3,7 +3,7 @@ use smart_garden_gateway_doctor::analyzer::{analyze, Analysis};
 use smart_garden_gateway_doctor::config::Config;
 use smart_garden_gateway_doctor::jig::{open_serial_port, power_off_dut, power_on_dut};
 use std::time::Duration;
-//use smart_garden_gateway_doctor::analyzer::receive;
+
 
 static TITLE: &str = "GARDENA smart Gateway Doctor";
 static SPACING: f32 = 20.0;
@@ -14,7 +14,7 @@ struct App {
     serial_port_index: usize,
     message: String,
     instructions: String,
-    //test_result_message: String,
+
 }
 
 impl Default for App {
@@ -27,7 +27,7 @@ impl Default for App {
             serial_port_index: 0,
             message: String::new(),
             instructions: String::new(),
-            //test_result_message: test(), // Use the test function from lib.rs
+
         }
     }
     
@@ -67,7 +67,7 @@ impl eframe::App for App {
             ui.label(format!("Instructions: {}", self.instructions));
 
             //ui.add(egui::Separator::default().spacing(SPACING));
-            //ui.label("S");
+
             
             egui::ScrollArea::vertical()
                 .id_source("some inner")
@@ -79,8 +79,7 @@ impl eframe::App for App {
                     });
                 });
             
-            
-            //ui.label("&self.test_result_message");
+
             
 
             ui.add(egui::Separator::default().spacing(SPACING));
