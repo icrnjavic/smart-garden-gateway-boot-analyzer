@@ -578,8 +578,7 @@ dependencies = [
 [[package]]
 name = "egui_logger"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64cb4864b317cef85800c89e05c71e1570a779a621f0986dd21a4483df5c69e6"
+source = "git+https://github.com/husqvarnagroup/egui_logger.git?branch=gardena/main#29d9ef54b4c42d10246d30434c4557c0fcad0d52"
 dependencies = [
  "egui",
  "log",

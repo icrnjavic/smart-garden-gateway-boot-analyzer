@@ -8,6 +8,7 @@ static TITLE: &str = "GARDENA smart Gateway Doctor";
 static SPACING: f32 = 20.0;
 
 struct App {
+    lm_id: String,
     serial_port_list: Vec<String>,
     serial_port_index: usize,
     message: String,
@@ -19,6 +20,7 @@ impl Default for App {
         let serial_port_list = vec![String::from("No serial port selected")];
 
         Self {
+            lm_id: String::new(),
             serial_port_list,
             serial_port_index: 0,
             message: String::new(),
@@ -32,23 +34,31 @@ impl eframe::App for App {
         self.update_serial_port_list();
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(TITLE);
+            ui.label(egui::RichText::new(TITLE).size(20.0));
 
             ui.add(egui::Separator::default().spacing(SPACING));
-
-            if ui.button("Go").clicked() {
-                if self.serial_port_index > 0 {
-                    self.message.clear();
-                    self.instructions.clear();
-                    let analysis = run(self.serial_port_list[self.serial_port_index].as_str());
-                    self.message = String::from(analysis.message);
-                    if let Some(instructions) = analysis.instructions {
-                        self.instructions = String::from(instructions);
+            ui.horizontal(|ui| {
+                ui.label("Enter PCB ID: ");
+                let field_resp =
+                    ui.add_sized([650.0, 20.0], egui::TextEdit::singleline(&mut self.lm_id));
+                let enter_pressed =
+                    field_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let button_presp = ui.button("Start");
+                if enter_pressed || button_presp.clicked() {
+                    if self.serial_port_index > 0 {
+                        info!("LM ID: {}", self.lm_id);
+                        self.message.clear();
+                        self.instructions.clear();
+                        let analysis = run(self.serial_port_list[self.serial_port_index].as_str());
+                        self.message = String::from(analysis.message);
+                        if let Some(instructions) = analysis.instructions {
+                            self.instructions = String::from(instructions);
+                        }
+                    } else {
+                        error!("No serial port selected");
                     }
-                } else {
-                    error!("No serial port selected");
                 }
-            }
+            });
 
             ui.add(egui::Separator::default().spacing(SPACING));
 
