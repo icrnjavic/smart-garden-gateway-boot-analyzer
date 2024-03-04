@@ -1,0 +1,50 @@
+console_output = [
+    '''
+U-Boot SPL 2021.04-gardena-6 (Jun 10 2021 - 16:05:31 +0000)
+Trying to boot from NOR
+
+
+U-Boot 2021.04-gardena-6 (Jun 10 2021 - 16:05:31 +0000)
+
+CPU:   MediaTek MT7688A ver:1 eco:2
+Boot:  DDR2, SPI-NOR 3-Byte Addr, CPU clock from XTAL
+Clock: CPU: 580MHz, Bus: 193MHz, XTAL: 40MHz
+Model: GARDENA smart Gateway (MT7688)
+DRAM:  128 MiB
+WDT:   Started with servicing (60s timeout)
+Loading Environment from SPIFlash... SF: Detected XM25QH64C with page size 256 Bytes, erase size 4 KiB, total 8 MiB
+OK
+F-Data:factory-data version 1 detected
+Net:   eth0: eth@10110000
+Autoboot in 2 seconds
+''',
+    "=>",
+    '''
+List of MTD devices:
+* nor0
+  - type: NOR flash
+  - block size: 0x1000 bytes
+  - min I/O: 0x1 bytes
+  - 0x000000000000-0x000000800000 : "nor0"
+	  - 0x000000000000-0x0000000a0000 : "uboot"
+	  - 0x0000000a0000-0x0000000b0000 : "uboot_env0"
+	  - 0x0000000b0000-0x0000000c0000 : "uboot_env1"
+	  - 0x0000000c0000-0x0000000d0000 : "factory"
+	  - 0x0000000d0000-0x000000800000 : "unused"
+* spi-nand0
+  - device: spi-nand@1
+  - parent: spi@b00
+  - driver: spi_nand
+  - type: NAND flash
+  - block size: 0x20000 bytes
+  - min I/O: 0x800 bytes
+  - OOB size: 128 bytes
+  - OOB available: 63 bytes
+  - 0x000000000000-0x000008000000 : "spi-nand0"
+	  - 0x000000000000-0x000008000000 : "nand"
+''',
+    "=> ",
+    "gpio: pin PA11 (gpio 11) value is 0",
+    "=> ",
+]
+message = "Button stuck"
