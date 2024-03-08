@@ -1,5 +1,5 @@
 use log::{error, info};
-use smart_garden_gateway_doctor::analyzer::{analyze, Analysis};
+use smart_garden_gateway_doctor::analyzer::{analyze, Diagnosis};
 use smart_garden_gateway_doctor::config::Config;
 use smart_garden_gateway_doctor::jig::{open_serial_port, power_off_dut, power_on_dut};
 use std::time::Duration;
@@ -49,9 +49,9 @@ impl eframe::App for App {
                         info!("LM ID: {}", self.lm_id);
                         self.message.clear();
                         self.instructions.clear();
-                        let analysis = run(self.serial_port_list[self.serial_port_index].as_str());
-                        self.message = String::from(analysis.message);
-                        if let Some(instructions) = analysis.instructions {
+                        let diagnosis = run(self.serial_port_list[self.serial_port_index].as_str());
+                        self.message = String::from(diagnosis.message);
+                        if let Some(instructions) = diagnosis.instructions {
                             self.instructions = String::from(instructions);
                         }
                     } else {
@@ -137,16 +137,16 @@ fn main() {
     );
 }
 
-fn run(serial_port_name: &str) -> Analysis {
+fn run(serial_port_name: &str) -> Diagnosis {
     // TODO: run in separate thread?
-    let mut analysis = Analysis::default();
+    let mut diagnosis = Diagnosis::default();
 
     if let Ok(mut serial_port) = open_serial_port(serial_port_name) {
-        info!("Starting analysis...");
+        info!("Starting diagnosis...");
 
         let config = Config::new();
         power_on_dut(&mut serial_port, config.invert_rts);
-        analysis = analyze(&mut serial_port);
+        diagnosis = analyze(&mut serial_port);
         power_off_dut(&mut serial_port, config.invert_rts);
 
         info!("Done");
@@ -154,5 +154,5 @@ fn run(serial_port_name: &str) -> Analysis {
         error!("Failed to open serial port {serial_port_name}");
     }
 
-    analysis
+    diagnosis
 }

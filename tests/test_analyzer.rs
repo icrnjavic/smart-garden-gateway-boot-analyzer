@@ -102,9 +102,9 @@ fn test_analyze(
         move |buf| t.read_console_output(buf)
     });
 
-    let analysis = analyze(&mut (serial_port as Box<dyn serialport::SerialPort>));
+    let diagnosis = analyze(&mut (serial_port as Box<dyn serialport::SerialPort>));
 
     let message = test_data.message.as_str();
 
-    assert_eq!(analysis.message, message);
+    assert_eq!(diagnosis.message, message);
 }

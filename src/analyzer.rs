@@ -12,7 +12,7 @@ struct CheckInfo {
 }
 
 #[derive(Default)]
-pub struct Analysis {
+pub struct Diagnosis {
     pub message: &'static str,
     pub instructions: Option<&'static str>,
 }
@@ -20,7 +20,7 @@ pub struct Analysis {
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
 static INSTRUCTIONS_BUTTON: &str = "Check button";
 
-pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Analysis {
+pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
     let early_check_info = vec![
         CheckInfo {
             not_expected: Some("SPL: failed to boot from all boot devices"),
@@ -70,7 +70,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Analysis {
         {
             log_issue(info.message, info.instructions);
 
-            return Analysis {
+            return Diagnosis {
                 message: info.message,
                 instructions: Some(info.instructions),
             };
@@ -98,14 +98,14 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Analysis {
         if !run_u_boot_check(serial_port, &info) {
             log_issue(info.message, info.instructions);
 
-            return Analysis {
+            return Diagnosis {
                 message: info.message,
                 instructions: Some(info.instructions),
             };
         }
     }
 
-    Analysis {
+    Diagnosis {
         message: "No issues found",
         ..Default::default()
     }
