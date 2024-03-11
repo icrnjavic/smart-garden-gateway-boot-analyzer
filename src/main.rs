@@ -38,15 +38,23 @@ impl eframe::App for App {
 
             ui.add(egui::Separator::default().spacing(SPACING));
             ui.horizontal(|ui| {
-                ui.label("Enter PCB ID: ");
+                ui.label("Enter IPRID: ");
                 let field_resp =
                     ui.add_sized([650.0, 20.0], egui::TextEdit::singleline(&mut self.lm_id));
                 let enter_pressed =
                     field_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 let button_presp = ui.button("Start");
                 if enter_pressed || button_presp.clicked() {
-                    if self.serial_port_index > 0 {
-                        info!("LM ID: {}", self.lm_id);
+                    info!("LM ID: {}", self.lm_id);
+                    let re =
+                        regex::Regex::new(r"^[0-9a-f]{8}[-']([0-9a-f]{4}[-']){3}[0-9a-f]{12}$")
+                            .expect("Falied to create regular expression");
+                    let mut lm_id_valid = true;
+                    if !re.is_match(self.lm_id.as_str()) {
+                        error!("Invalid IPRID entered");
+                        lm_id_valid = false;
+                    }
+                    if self.serial_port_index > 0 && lm_id_valid {
                         self.message.clear();
                         self.instructions.clear();
                         let diagnosis = run(self.serial_port_list[self.serial_port_index].as_str());

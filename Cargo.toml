@@ -17,6 +17,7 @@ eframe = { version = "0.26.2", default-features = false, features = [
 egui_logger = { git = "https://github.com/husqvarnagroup/egui_logger.git", branch = "gardena/main" }
 figment = { version = "0.10.11", features = ["toml"] }
 log = "0.4.21"
+regex = "1.10.3"
 serde = { version = "1.0.188", features = ["derive"] }
 serialport = "4.2.2"
 toml = "0.8.2"
