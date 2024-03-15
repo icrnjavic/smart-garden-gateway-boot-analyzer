@@ -1,7 +1,10 @@
 use log::{error, info};
+use serialport::SerialPort;
 use smart_garden_gateway_doctor::analyzer::{analyze, Diagnosis};
 use smart_garden_gateway_doctor::config::Config;
 use smart_garden_gateway_doctor::jig::{open_serial_port, power_off_dut, power_on_dut};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 static TITLE: &str = "GARDENA smart Gateway Doctor";
@@ -11,20 +14,27 @@ struct App {
     lm_id: String,
     serial_port_list: Vec<String>,
     serial_port_index: usize,
+    serial_port: Option<Arc<Mutex<Box<dyn SerialPort>>>>,
     message: String,
     instructions: String,
+    tx: Sender<Diagnosis>,
+    rx: Receiver<Diagnosis>,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
         let serial_port_list = vec![String::from("No serial port selected")];
 
         Self {
             lm_id: String::new(),
             serial_port_list,
             serial_port_index: 0,
+            serial_port: None,
             message: String::new(),
             instructions: String::new(),
+            tx,
+            rx,
         }
     }
 }
@@ -57,11 +67,7 @@ impl eframe::App for App {
                     if self.serial_port_index > 0 && lm_id_valid {
                         self.message.clear();
                         self.instructions.clear();
-                        let diagnosis = run(self.serial_port_list[self.serial_port_index].as_str());
-                        self.message = String::from(diagnosis.message);
-                        if let Some(instructions) = diagnosis.instructions {
-                            self.instructions = String::from(instructions);
-                        }
+                        self.run();
                     } else {
                         error!("No serial port selected");
                     }
@@ -95,9 +101,22 @@ impl eframe::App for App {
                 )
                 .changed()
             {
-                self.select_serial_port();
+                self.open_serial_port();
             }
         });
+
+        if self.serial_port.is_none() {
+            self.open_serial_port();
+        }
+
+        if let Ok(diagnosis) = self.rx.try_recv() {
+            self.message = String::from(diagnosis.message);
+            if let Some(instructions) = diagnosis.instructions {
+                self.instructions = String::from(instructions);
+            }
+            self.lm_id.clear();
+        }
+
         std::thread::sleep(Duration::from_millis(100));
         ctx.request_repaint();
     }
@@ -124,14 +143,60 @@ impl App {
         }
     }
 
-    fn select_serial_port(&mut self) {
+    fn open_serial_port(&mut self) {
         if self.serial_port_index > 0 {
-            let serial_port_name = self.serial_port_list[self.serial_port_index].clone();
-            info!("Serial port {serial_port_name} selected");
+            if let Some(s) = self.serial_port.clone() {
+                if s.try_lock().is_err() {
+                    error!("Failed to change serial port, port in use");
+                    return;
+                }
+            }
 
-            let mut config = Config::new();
-            config.serial_port = serial_port_name;
-            config.save();
+            let serial_port_name = self.serial_port_list[self.serial_port_index].clone();
+
+            if let Ok(serial_port) = open_serial_port(&serial_port_name) {
+                info!("Successfully opened serial port {serial_port_name}");
+                self.serial_port = Some(Arc::new(Mutex::new(serial_port)));
+
+                let mut config = Config::new();
+
+                if let Some(s) = self.serial_port.clone() {
+                    if let Ok(mut serial_port) = s.lock() {
+                        power_off_dut(&mut serial_port, config.invert_rts);
+                    }
+                }
+
+                config.serial_port = serial_port_name;
+                config.save();
+            } else {
+                error!("Failed to open serial port {serial_port_name}");
+            }
+        }
+    }
+
+    fn run(&mut self) {
+        if let Some(s) = &self.serial_port {
+            let s = s.clone();
+            let tx = self.tx.clone();
+            std::thread::spawn(move || {
+                if let Ok(mut serial_port) = s.try_lock() {
+                    info!("Starting diagnosis...");
+
+                    let config = Config::new();
+                    power_on_dut(&mut serial_port, config.invert_rts);
+                    let diagnosis = analyze(&mut serial_port);
+                    power_off_dut(&mut serial_port, config.invert_rts);
+
+                    if tx.send(diagnosis).is_err() {
+                        error!("Failed to send diagnosis to main thread");
+                    }
+                    info!("Done");
+                } else {
+                    error!("Failed to access serial port");
+                }
+            });
+        } else {
+            error!("No serial port selected");
         }
     }
 }
@@ -143,24 +208,4 @@ fn main() {
         eframe::NativeOptions::default(),
         Box::new(|_cc| Box::<App>::default()),
     );
-}
-
-fn run(serial_port_name: &str) -> Diagnosis {
-    // TODO: run in separate thread?
-    let mut diagnosis = Diagnosis::default();
-
-    if let Ok(mut serial_port) = open_serial_port(serial_port_name) {
-        info!("Starting diagnosis...");
-
-        let config = Config::new();
-        power_on_dut(&mut serial_port, config.invert_rts);
-        diagnosis = analyze(&mut serial_port);
-        power_off_dut(&mut serial_port, config.invert_rts);
-
-        info!("Done");
-    } else {
-        error!("Failed to open serial port {serial_port_name}");
-    }
-
-    diagnosis
 }
