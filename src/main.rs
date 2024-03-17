@@ -16,7 +16,9 @@ struct App {
     serial_port_index: usize,
     serial_port: Option<Arc<Mutex<Box<dyn SerialPort>>>>,
     message: String,
+    message_color: egui::Color32,
     instructions: String,
+    busy: bool,
     tx: Sender<Diagnosis>,
     rx: Receiver<Diagnosis>,
 }
@@ -32,7 +34,9 @@ impl Default for App {
             serial_port_index: 0,
             serial_port: None,
             message: String::new(),
+            message_color: egui::Color32::default(),
             instructions: String::new(),
+            busy: false,
             tx,
             rx,
         }
@@ -41,68 +45,57 @@ impl Default for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.update_serial_port_list();
+        self.update_serial_port_info();
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label(egui::RichText::new(TITLE).size(20.0));
 
             ui.add(egui::Separator::default().spacing(SPACING));
             ui.horizontal(|ui| {
-                ui.label("Enter IPRID: ");
-                let field_resp =
-                    ui.add_sized([650.0, 20.0], egui::TextEdit::singleline(&mut self.lm_id));
-                let enter_pressed =
-                    field_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                let button_presp = ui.button("Start");
-                if enter_pressed || button_presp.clicked() {
-                    info!("LM ID: {}", self.lm_id);
-                    let re =
-                        regex::Regex::new(r"^[0-9a-f]{8}[-']([0-9a-f]{4}[-']){3}[0-9a-f]{12}$")
-                            .expect("Falied to create regular expression");
-                    let mut lm_id_valid = true;
-                    if !re.is_match(self.lm_id.as_str()) {
-                        error!("Invalid IPRID entered");
-                        lm_id_valid = false;
-                    }
-                    if self.serial_port_index > 0 && lm_id_valid {
-                        self.message.clear();
-                        self.instructions.clear();
-                        self.run();
-                    } else {
-                        error!("No serial port selected");
-                    }
+                ui.label("Scan IPRID QR code: ");
+                let field_resp = ui.add_sized(
+                    ui.available_size(),
+                    egui::TextEdit::singleline(&mut self.lm_id),
+                );
+                if field_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    self.busy = true;
+                    self.check_lm_id_and_run();
+                }
+                if !self.busy {
+                    field_resp.request_focus();
                 }
             });
 
             ui.add(egui::Separator::default().spacing(SPACING));
 
-            ui.label(format!("Result: {}", self.message));
-            ui.label(format!("Instructions: {}", self.instructions));
+            ui.horizontal(|ui| {
+                ui.label("Issue:");
+                ui.colored_label(self.message_color, &self.message);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Instructions:");
+                ui.colored_label(self.message_color, &self.instructions);
+            });
 
             ui.add(egui::Separator::default().spacing(SPACING));
 
-            egui::ScrollArea::vertical()
-                .id_source("some inner")
-                .max_height(400.0)
-                .show(ui, |ui| {
-                    ui.push_id("second", |ui| {
-                        egui_logger::logger_ui(ui);
-                    });
-                });
+            egui_logger::logger_ui(ui);
 
             ui.add(egui::Separator::default().spacing(SPACING));
 
-            if egui::ComboBox::from_id_source("serial_port")
-                .show_index(
-                    ui,
-                    &mut self.serial_port_index,
-                    self.serial_port_list.len(),
-                    |i| self.serial_port_list[i].as_str(),
-                )
-                .changed()
-            {
-                self.open_serial_port();
-            }
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                if egui::ComboBox::from_id_source("serial_port")
+                    .show_index(
+                        ui,
+                        &mut self.serial_port_index,
+                        self.serial_port_list.len(),
+                        |i| self.serial_port_list[i].as_str(),
+                    )
+                    .changed()
+                {
+                    self.open_serial_port();
+                }
+            });
         });
 
         if self.serial_port.is_none() {
@@ -114,7 +107,12 @@ impl eframe::App for App {
             if let Some(instructions) = diagnosis.instructions {
                 self.instructions = String::from(instructions);
             }
-            self.lm_id.clear();
+            self.message_color = if diagnosis.healthy {
+                egui::Color32::GREEN
+            } else {
+                egui::Color32::RED
+            };
+            self.busy = false;
         }
 
         std::thread::sleep(Duration::from_millis(100));
@@ -123,7 +121,7 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn update_serial_port_list(&mut self) {
+    fn update_serial_port_info(&mut self) {
         if let Ok(ports) = serialport::available_ports() {
             let mut port_name = &self.serial_port_list[self.serial_port_index];
             let config = Config::new();
@@ -174,6 +172,30 @@ impl App {
         }
     }
 
+    fn abort(&mut self, error: &str) {
+        error!("{error}");
+        self.busy = false;
+    }
+
+    fn check_lm_id_and_run(&mut self) {
+        egui_logger::clear_log();
+
+        info!("LM ID: {}", self.lm_id);
+
+        self.message.clear();
+        self.instructions.clear();
+
+        let re = regex::Regex::new(r"^[0-9a-f]{8}[-']([0-9a-f]{4}[-']){3}[0-9a-f]{12}$")
+            .expect("Failed to create regular expression");
+        if re.is_match(self.lm_id.as_str()) {
+            self.run();
+        } else {
+            self.abort("Invalid IPRID entered");
+        }
+
+        self.lm_id.clear();
+    }
+
     fn run(&mut self) {
         if let Some(s) = &self.serial_port {
             let s = s.clone();
@@ -192,11 +214,18 @@ impl App {
                     }
                     info!("Done");
                 } else {
-                    error!("Failed to access serial port");
+                    let diagnosis = Diagnosis {
+                        message: "Failed to access serial port",
+                        healthy: false,
+                        ..Default::default()
+                    };
+                    if tx.send(diagnosis).is_err() {
+                        error!("Failed to send diagnosis to main thread");
+                    }
                 }
             });
         } else {
-            error!("No serial port selected");
+            self.abort("No serial port selected");
         }
     }
 }

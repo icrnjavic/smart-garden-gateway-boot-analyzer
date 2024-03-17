@@ -15,6 +15,7 @@ struct CheckInfo {
 pub struct Diagnosis {
     pub message: &'static str,
     pub instructions: Option<&'static str>,
+    pub healthy: bool,
 }
 
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
@@ -73,6 +74,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
             return Diagnosis {
                 message: info.message,
                 instructions: Some(info.instructions),
+                healthy: false,
             };
         }
     }
@@ -101,12 +103,14 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
             return Diagnosis {
                 message: info.message,
                 instructions: Some(info.instructions),
+                healthy: false,
             };
         }
     }
 
     Diagnosis {
         message: "No issues found",
+        healthy: true,
         ..Default::default()
     }
 }
