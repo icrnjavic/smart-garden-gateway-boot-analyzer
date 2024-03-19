@@ -48,11 +48,13 @@ impl eframe::App for App {
         self.update_serial_port_info();
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(egui::RichText::new(TITLE).size(20.0));
+            ui.label(egui::RichText::new(TITLE).color(egui::Color32::WHITE).size(20.0));
+            
 
             ui.add(egui::Separator::default().spacing(SPACING));
             ui.horizontal(|ui| {
-                ui.label("Scan IPRID QR code: ");
+                ui.label(egui::RichText::new("Scan IPRID QR code: ").color(egui::Color32::WHITE).size(14.0));
+
                 let field_resp = ui.add_sized(
                     ui.available_size(),
                     egui::TextEdit::singleline(&mut self.lm_id),
@@ -69,11 +71,13 @@ impl eframe::App for App {
             ui.add(egui::Separator::default().spacing(SPACING));
 
             ui.horizontal(|ui| {
-                ui.label("Issue:");
+                ui.label(egui::RichText::new("Issue:").color(egui::Color32::WHITE).size(13.0));
+
                 ui.colored_label(self.message_color, &self.message);
             });
             ui.horizontal(|ui| {
-                ui.label("Instructions:");
+                ui.label(egui::RichText::new("Instructions:").color(egui::Color32::WHITE).size(13.0));
+
                 ui.colored_label(self.message_color, &self.instructions);
             });
 
