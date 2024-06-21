@@ -1,6 +1,7 @@
-use log::{debug, info};
+use log::{debug, info, error};
 use serialport::SerialPort;
 use std::io::{Read, Write};
+use std::fs::OpenOptions;
 
 #[derive(Default)]
 struct CheckInfo {
@@ -21,7 +22,7 @@ pub struct Diagnosis {
 static INSTRUCTIONS_LM: &str = "Linux Module (probably) faulty, return to UniElec";
 static INSTRUCTIONS_BUTTON: &str = "Check button";
 
-pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
+pub fn analyze(serial_port: &mut Box<dyn SerialPort>, lm_id: &str) -> Diagnosis {
     let early_check_info = vec![
         CheckInfo {
             not_expected: Some("SPL: failed to boot from all boot devices"),
@@ -61,7 +62,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
             ..Default::default()
         },
     ];
-    let console_output = enter_u_boot(serial_port);
+    let console_output = enter_u_boot(serial_port, lm_id);
 
     for info in early_check_info {
         if info
@@ -97,7 +98,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
     ];
 
     for info in u_boot_check_info {
-        if !run_u_boot_check(serial_port, &info) {
+        if !run_u_boot_check(serial_port, &info, lm_id) {
             log_issue(info.message, info.instructions);
 
             return Diagnosis {
@@ -107,6 +108,7 @@ pub fn analyze(serial_port: &mut Box<dyn SerialPort>) -> Diagnosis {
             };
         }
     }
+
 
     Diagnosis {
         message: "No issues found",
@@ -127,7 +129,7 @@ fn send(serial_port: &mut Box<dyn SerialPort>, buf: &[u8]) -> Result<(), serialp
     Ok(())
 }
 
-fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
+fn receive(serial_port: &mut Box<dyn SerialPort>, lm_id: &str) -> Option<String> {
     let mut buf = [0; 1000];
     let bytes_read = serial_port.read(&mut buf).unwrap_or(0);
     if bytes_read == 0 {
@@ -139,17 +141,27 @@ fn receive(serial_port: &mut Box<dyn SerialPort>) -> Option<String> {
     }
     debug!("{s}");
     std::io::stdout().flush().expect("Failed to flush stdout");
+
+    let file_name = format!("{}.txt", lm_id);
+    if let Ok(mut file) = OpenOptions::new().append(true).open(&file_name) {
+        if let Err(e) = writeln!(file, "{}", s) {
+            error!("ailed to append s to file: {}", e);
+        }
+    } else {
+        error!("failed to open the log file");
+    }
+
     Some(s)
 }
 
-fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>) -> String {
+fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>, lm_id: &str) -> String {
     let mut console_output = String::new();
     let mut timeout_counter = 0;
 
     loop {
         send(serial_port, b"x").expect("Failed to write to serial port");
 
-        if let Some(s) = receive(serial_port) {
+        if let Some(s) = receive(serial_port, lm_id) {
             console_output += s.as_str();
             timeout_counter = 0;
         } else {
@@ -164,14 +176,14 @@ fn enter_u_boot(serial_port: &mut Box<dyn SerialPort>) -> String {
     console_output
 }
 
-fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str) -> String {
+fn run_u_boot_cmd(serial_port: &mut Box<dyn SerialPort>, cmd: &str, lm_id: &str) -> String {
     send(serial_port, format!("{cmd}\n").as_bytes()).expect("Failed to write to serial port");
 
     let mut console_output = String::new();
     let mut timeout_counter = 0;
 
     loop {
-        if let Some(s) = receive(serial_port) {
+        if let Some(s) = receive(serial_port, lm_id) {
             console_output += s.as_str();
             timeout_counter = 0;
         } else {
@@ -190,8 +202,8 @@ fn log_issue(issue: &str, instructions: &str) {
     info!("{instructions}");
 }
 
-fn run_u_boot_check(serial_port: &mut Box<dyn SerialPort>, info: &CheckInfo) -> bool {
-    let console_output = run_u_boot_cmd(serial_port, info.command.expect("Missing U-Boot command"));
+fn run_u_boot_check(serial_port: &mut Box<dyn SerialPort>, info: &CheckInfo, lm_id: &str) -> bool {
+    let console_output = run_u_boot_cmd(serial_port, info.command.expect("Missing U-Boot command"), lm_id);
 
     !(info
         .not_expected

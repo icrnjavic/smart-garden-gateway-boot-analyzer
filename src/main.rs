@@ -3,6 +3,8 @@ use serialport::SerialPort;
 use smart_garden_gateway_doctor::analyzer::{analyze, Diagnosis};
 use smart_garden_gateway_doctor::config::Config;
 use smart_garden_gateway_doctor::jig::{open_serial_port, power_off_dut, power_on_dut};
+use std::fs::File;
+use std::io::prelude::*;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -193,6 +195,11 @@ impl App {
             .expect("Failed to create regular expression");
         if re.is_match(self.lm_id.as_str()) {
             self.run();
+
+            let file_name = format!("{}.txt", self.lm_id);
+            if let Err(e) = write_to_file(&file_name, &self.lm_id) {
+                error!("Failed to write to file: {}", e);
+            }
         } else {
             self.abort("Invalid IPRID entered");
         }
@@ -204,13 +211,14 @@ impl App {
         if let Some(s) = &self.serial_port {
             let s = s.clone();
             let tx = self.tx.clone();
+            let lm_id = self.lm_id.clone();
             std::thread::spawn(move || {
                 if let Ok(mut serial_port) = s.try_lock() {
                     info!("Starting diagnosis...");
 
                     let config = Config::new();
                     power_on_dut(&mut serial_port, config.invert_rts);
-                    let diagnosis = analyze(&mut serial_port);
+                    let diagnosis = analyze(&mut serial_port, &lm_id); 
                     power_off_dut(&mut serial_port, config.invert_rts);
 
                     if tx.send(diagnosis).is_err() {
@@ -232,6 +240,12 @@ impl App {
             self.abort("No serial port selected");
         }
     }
+}
+
+fn write_to_file(file_name: &str, content: &str) -> std::io::Result<()> {
+    let mut file = File::create(file_name)?;
+    file.write_all(content.as_bytes())?;
+    Ok(())
 }
 
 fn main() {
